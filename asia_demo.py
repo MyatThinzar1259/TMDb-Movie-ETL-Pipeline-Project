@@ -1,180 +1,111 @@
 import requests
-import logging
-import pandas as pd
-import time
 import os
-import csv
-import glob
 from dotenv import load_dotenv
-from extract import get_genres, get_movie_details, extract_json_from_url  # Import functions from extract.py
-
+import time
+from typing import List, Dict, Optional
+from utils_csv import save_movies_to_csv
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Configure the logging module
-logging.basicConfig(
-    level=logging.DEBUG,  # Set the minimum logging level
-    format='%(asctime)s - %(levelname)s - %(message)s',  # Define the log message format
-    filename="asia_demo.log"
-)
-
-# Get the API key from the environment
-api_key = os.getenv("API_KEY")
+API_KEY = os.getenv("API_KEY")
 BASE_URL = "https://api.themoviedb.org/3"
 
-OUTPUT_FOLDER = "tmdb_movies_filtered"
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+def get_movie_details(movie_id: int, max_retries: int = 3) -> dict:
+    url = f"{BASE_URL}/movie/{movie_id}"
+    params = {
+        "api_key": API_KEY,
+        "language": "en-US"
+    }
+    retries = 0
+    while retries < max_retries:
+        try:
+            print(f"[INFO] Fetching details for movie ID: {movie_id} (Attempt {retries+1}/{max_retries})")
+            resp = requests.get(url, params=params, timeout=20)
+            resp.raise_for_status()
+            print(f"[INFO] Successfully fetched details for movie ID: {movie_id}")
+            return resp.json()
+        except requests.exceptions.RequestException as e:
+            retries += 1
+            print(f"[ERROR] Failed to fetch details for movie {movie_id}: {e}")
+            if retries < max_retries:
+                print(f"[INFO] Retrying in 3 seconds...")
+                time.sleep(3)
+            else:
+                print(f"[ERROR] Max retries reached for movie {movie_id}. Skipping.")
+                return {}
+    return {}
 
+def extract_names(items: list, key: str) -> str:
+    return ', '.join(item.get(key, '') for item in items if item.get(key))
 
-def save_movies_to_csv(movies: list, filename: str):
-    with open(filename, mode='w', encoding='utf-8', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            'id', 'title', 'overview', 'rating', 'release_date',
-            'original_language', 'genres' , 'production_companies'
-        ])
-        for movie in movies:
-            writer.writerow([
-                movie['id'],
-                movie['title'],
-                movie['overview'],
-                movie['rating'],
-                movie['release_date'],
-                movie['original_language'],
-                movie['production_companies'],
-                movie['genres'],
-            ])
+def fetch_movies(language_code: str, year: int = 2024, max_retries: int = 3) -> List[Dict]:
+    movies = []
+    page = 1
+    total_pages = 1
 
-def get_movies_by_language(language_code: str, max_pages: int = 500, save_every: int = 50):
-    all_movies = []
-    genres = get_genres()
-    genre_map = {g['id']: g['name'] for g in genres}
-    companies = {}
-    languages  = {}
+    print(f"[INFO] Starting fetch for language: {language_code}")
 
-    start_page = 1
-    # Loop until reaching the max page limit
-    while start_page <= max_pages:
-        
-        # Define the last page of this batch
-        end_page = min(start_page + save_every - 1, max_pages)
-        # Define the CSV filename
-        filename = f"{OUTPUT_FOLDER}/{language_code}_movies_p{start_page}_to_p{end_page}.csv"
-
-        # Skip fetching if this file already exists
-        if os.path.exists(filename):
-            logging.info(f" Skipping {language_code} pages {start_page}-{end_page}, file exists.")
-            start_page += save_every
-            continue
-
-        logging.info(f" Fetching {language_code} pages {start_page} to {end_page}...")
-        movies_list = []
-        for page in range(start_page, end_page + 1):
-            url = f"{BASE_URL}/discover/movie"
-            params = {
-            'api_key': api_key,
+    while page <= total_pages:
+        print(f"[INFO] Fetching page {page} of {total_pages} for language '{language_code}'...")
+        url = f"{BASE_URL}/discover/movie"
+        params = {
+            'api_key': API_KEY,
             'language': 'en-US',
             'page': page,
             'with_original_language': language_code,
-            'primary_release_date.gte': '2024-01-01',
-            'primary_release_date.lte': '2024-12-31'
+            'primary_release_date.gte': f'{year}-01-01',
+            'primary_release_date.lte': f'{year}-12-31'
         }
-
+        retries = 0
+        while retries < max_retries:
             try:
+                resp = requests.get(url, params=params, timeout=20)
+                resp.raise_for_status()
+                data = resp.json()
+                break
+            except requests.exceptions.RequestException as e:
+                retries += 1
+                print(f"[ERROR] Failed to fetch page {page} for '{language_code}': {e}")
+                if retries < max_retries:
+                    print(f"[INFO] Retrying in 5 seconds... (Attempt {retries}/{max_retries})")
+                    time.sleep(5)
+                else:
+                    print(f"[ERROR] Max retries reached for page {page}. Skipping.")
+                    return movies
 
-                movie_json = extract_json_from_url(url, params)
-                results = movie_json.get('results', [])
-                print(f"Page {page}: {len(results)} results")
+        if page == 1:
+            total_pages = data.get('total_pages', 1)
+            print(f"[INFO] Total pages to fetch for '{language_code}': {total_pages}")
+        for movie in data.get('results', []):
+            movie_id = movie.get('id')
+            details = get_movie_details(movie_id, max_retries=max_retries) if movie_id else {}
+            production_companies = extract_names(details.get('production_companies', []), 'name')
+            genres = extract_names(details.get('genres', []), 'name')
+            movies.append({
+                'title': movie.get('title'),
+                'overview': movie.get('overview'),
+                'rating': movie.get('vote_average'),
+                'release_date': movie.get('release_date'),
+                'original_language': movie.get('original_language'),
+                'production_companies': production_companies,
+                'genres': genres
+            })
+        page += 1
+    return movies
 
-                if not results:
-                   break
+def fetch_and_save_movies(language_code: str, output_file: Optional[str] = None, output_dir: str = "results") -> None:
+    if not output_file:
+        output_file = f"{language_code}_movies_simple.csv"
+    output_path = os.path.join(output_dir, output_file)
+    movies = fetch_movies(language_code)
+    save_movies_to_csv(movies, output_path)
 
-                for movie in results:
-                    movie_details = get_movie_details(movie['id'])  # Call TMDb API again for details
-
-                    #to get the data of production companies for each movie
-                    for company in movie_details.get("production_companies", []):
-                        companies[company['id']] = {
-                            'company_id' : company['id'],
-                            'company_name' : company['name']
-                        }
-
-                        # to get  language data of each movie
-                    lang_code = movie_details.get("original_language", "unknown")
-                    if lang_code not in languages:
-                        languages[lang_code] = {
-                            "language_code": lang_code,
-                            "language_name": lang_code  # Could map "en" → "English" later
-                                }
-                            
-                    movie_data = {
-                        'id': movie['id'],
-                        'title': movie['title'],
-                        'overview': movie['overview'],
-                        'rating': movie['vote_average'],
-                        'release_date': movie['release_date'],
-                        'original_language': movie['original_language'],
-                        'production_companies': ','.join([c['name'] for c in movie_details.get("production_companies", [])]),
-                        'genres': ','.join([genre_map.get(gid, str(gid)) for gid in movie['genre_ids']])
-                        }
-                    movies_list.append(movie_data)
-                    all_movies.append(movie_data)
-                time.sleep(0.25)
-            except Exception as e:
-                    logging.error(f" Failed on page {page}: {e}")
-                    continue
-        
-        if movies_list:
-        # Save the batch of movies to CSV
-            save_movies_to_csv(movies_list, filename)
-            logging.info(f" Saved {len(movies_list)} movies to {filename}")
-            print(f"Saved {len(movies_list)} movies to {filename}")
-        else:
-            logging.warning(f"No movies collected in batch {start_page}-{end_page}")
-        # Clear buffer and move to the next batch
-        start_page += save_every
-
-    logging.info(f" Done fetching for language {language_code}")
-    data_dict = {"movies_list": all_movies ,  
-                 "genres" : genres,
-                 "companies" : companies,
-                 "languages" : languages}
-    return data_dict
-
-def merge_csvs_by_language(language_code: str, input_folder: str = OUTPUT_FOLDER, output_folder: str = "tmdb_merged_csv"):
-    os.makedirs(output_folder, exist_ok=True)
-
-    pattern = os.path.join(input_folder, f"{language_code}_movies_p*_to_p*.csv")
-    csv_files = sorted(glob.glob(pattern))
-
-    if not csv_files:
-        logging.warning(f"No partial CSVs found for {language_code} to merge.")
-        return
-
-    # Read and concatenate all partial CSVs
-    df_list = [pd.read_csv(file) for file in csv_files]
-    merged_df = pd.concat(df_list, ignore_index=True)
-
-    # Save the merged file
-    merged_filename = os.path.join(output_folder, f"{language_code}_movies_all.csv")
-    merged_df.to_csv(merged_filename, index=False)
-    logging.info(f"Merged {len(csv_files)} CSVs into {merged_filename} ({len(merged_df)} rows)")
-
-    return len(merged_df)
-
-
+def main():
+    languages = ['hi']
+    for lang in languages:
+        print("="*40)
+        fetch_and_save_movies(lang)
+        print("="*40)
 
 if __name__ == "__main__":
-    # Run for  selected languages
-    languages = ['ko', 'ja', 'th', 'tl']  # Korean, Japanese, Thai, Filipino
-    for lang in languages:
-        get_movies_by_language(lang)
-        total_rows = merge_csvs_by_language(lang)
-        print(f" {lang} → {total_rows} movies")
-
-# tota movies 
-# ko = 811
-# ja = 1009
-# th = 293
-# tl = 507
+    main()

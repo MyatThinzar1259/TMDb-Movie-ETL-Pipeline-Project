@@ -1,2 +1,5 @@
 .env
 de_env
+venv
+results
+__pycache__/
