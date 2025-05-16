@@ -4,13 +4,16 @@ from dotenv import load_dotenv
 import time
 from typing import List, Dict, Optional
 from utils_csv import save_movies_to_csv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Load environment variables from .env file
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 BASE_URL = "https://api.themoviedb.org/3"
+MAX_RETRIES = 3
+MAX_WORKERS = 50 # Adjust this based on your system's capabilities 50 to 100
 
-def get_movie_details(movie_id: int, max_retries: int = 3) -> dict:
+def get_movie_details(movie_id: int, max_retries: int = MAX_RETRIES) -> dict:
     url = f"{BASE_URL}/movie/{movie_id}"
     params = {
         "api_key": API_KEY,
@@ -38,13 +41,15 @@ def get_movie_details(movie_id: int, max_retries: int = 3) -> dict:
 def extract_names(items: list, key: str) -> str:
     return ', '.join(item.get(key, '') for item in items if item.get(key))
 
-def fetch_movies(language_code: str, year: int = 2024, max_retries: int = 3) -> List[Dict]:
+def fetch_movies(language_code: str, year: int = 2024, max_retries: int = MAX_RETRIES) -> List[Dict]:
     movies = []
+    movie_ids = []
     page = 1
     total_pages = 1
 
     print(f"[INFO] Starting fetch for language: {language_code}")
 
+    # Step 1: Collect all movie IDs
     while page <= total_pages:
         print(f"[INFO] Fetching page {page} of {total_pages} for language '{language_code}'...")
         url = f"{BASE_URL}/discover/movie"
@@ -54,7 +59,7 @@ def fetch_movies(language_code: str, year: int = 2024, max_retries: int = 3) -> 
             'page': page,
             'with_original_language': language_code,
             'primary_release_date.gte': f'{year}-01-01',
-            'primary_release_date.lte': f'{year}-12-31'
+            'primary_release_date.lte': f'{year}-01-31'
         }
         retries = 0
         while retries < max_retries:
@@ -78,30 +83,57 @@ def fetch_movies(language_code: str, year: int = 2024, max_retries: int = 3) -> 
             print(f"[INFO] Total pages to fetch for '{language_code}': {total_pages}")
         for movie in data.get('results', []):
             movie_id = movie.get('id')
-            details = get_movie_details(movie_id, max_retries=max_retries) if movie_id else {}
-            production_companies = extract_names(details.get('production_companies', []), 'name')
-            genres = extract_names(details.get('genres', []), 'name')
-            movies.append({
-                'title': movie.get('title'),
-                'overview': movie.get('overview'),
-                'rating': movie.get('vote_average'),
-                'release_date': movie.get('release_date'),
-                'original_language': movie.get('original_language'),
-                'production_companies': production_companies,
-                'genres': genres
-            })
+            if movie_id:
+                movie_ids.append((movie, movie_id))
         page += 1
+
+    # Step 2: Fetch movie details in parallel
+    def fetch_details(movie_tuple):
+        movie, movie_id = movie_tuple
+
+        details = get_movie_details(movie_id, max_retries=max_retries)
+
+        production_companies = extract_names(details.get('production_companies', []), 'name')
+        genres = extract_names(details.get('genres', []), 'name')
+        return {
+            'title': movie.get('title'),
+            'overview': movie.get('overview'),
+            'rating': movie.get('vote_average'),
+            'release_date': movie.get('release_date'),
+            'original_language': movie.get('original_language'),
+            'production_companies': production_companies,
+            'genres': genres
+        }
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = []
+
+        for tup in movie_ids:
+            future = executor.submit(fetch_details, tup)
+            futures.append(future)
+
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                movies.append(result)
+            except Exception as exc:
+                print(f"[ERROR] Exception occurred: {exc}")
+
     return movies
 
 def fetch_and_save_movies(language_code: str, output_file: Optional[str] = None, output_dir: str = "results") -> None:
+    start_time = time.time()
     if not output_file:
         output_file = f"{language_code}_movies_simple.csv"
     output_path = os.path.join(output_dir, output_file)
     movies = fetch_movies(language_code)
     save_movies_to_csv(movies, output_path)
+    end_time = time.time()
+    total_time = end_time - start_time
+    print(f"[INFO] Total time taken to fetch and save movies for '{language_code}': {total_time:.2f} seconds")
 
 def main():
-    languages = ['hi']
+    languages = ['ja']
     for lang in languages:
         print("="*40)
         fetch_and_save_movies(lang)
