@@ -18,7 +18,11 @@ def fetch_wikipedia_page(url: str) -> Optional[BeautifulSoup]:
         return None
 
 def extract_movies_from_tables(soup: BeautifulSoup) -> List[Dict[str, str]]:
-    tables = [table for table in soup.find_all('table', class_='wikitable') if not table.find('caption')]
+    tables = []
+    for table in soup.find_all('table', class_='wikitable'):
+        if not table.find('caption'):
+            tables.append(table)
+            
     all_movies = []
     for table in tables:
         rows = table.find_all('tr')[1:]
