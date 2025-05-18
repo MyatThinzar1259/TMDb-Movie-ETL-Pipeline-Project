@@ -1,2 +1,6 @@
 .env
 de_env
+venv
+raw_data
+clean_data
+__pycache__/
