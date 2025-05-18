@@ -5,8 +5,8 @@ from typing import List, Dict, Optional
 from utils_csv import save_movies_to_csv
 
 WIKI_URL = 'https://en.wikipedia.org/wiki/List_of_American_films_of_2024'
-OUTPUT_DIR = "results"
-OUTPUT_FILE = "hollywood_movies_2024.csv"
+OUTPUT_DIR = "raw_data"
+OUTPUT_FILE = "american_movies_2024.csv"
 
 def fetch_wikipedia_page(url: str) -> Optional[BeautifulSoup]:
     try:

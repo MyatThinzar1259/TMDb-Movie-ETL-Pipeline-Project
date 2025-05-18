@@ -12,6 +12,7 @@ API_KEY = os.getenv("API_KEY")
 BASE_URL = "https://api.themoviedb.org/3"
 MAX_RETRIES = 3
 MAX_WORKERS = 50 # Adjust this based on your system's capabilities 50 to 100
+FILTER_YEAR = 2024
 
 def get_movie_details(movie_id: int, max_retries: int = MAX_RETRIES) -> dict:
     url = f"{BASE_URL}/movie/{movie_id}"
@@ -41,7 +42,7 @@ def get_movie_details(movie_id: int, max_retries: int = MAX_RETRIES) -> dict:
 def extract_names(items: list, key: str) -> str:
     return ', '.join(item.get(key, '') for item in items if item.get(key))
 
-def fetch_movies(language_code: str, year: int = 2024, max_retries: int = MAX_RETRIES) -> List[Dict]:
+def fetch_movies(language_code: str, max_retries: int = MAX_RETRIES) -> List[Dict]:
     movies = []
     movie_ids = []
     page = 1
@@ -58,8 +59,8 @@ def fetch_movies(language_code: str, year: int = 2024, max_retries: int = MAX_RE
             'language': 'en-US',
             'page': page,
             'with_original_language': language_code,
-            'primary_release_date.gte': f'{year}-01-01',
-            'primary_release_date.lte': f'{year}-01-31'
+            'primary_release_date.gte': f'{FILTER_YEAR}-01-01',
+            'primary_release_date.lte': f'{FILTER_YEAR}-12-31'
         }
         retries = 0
         while retries < max_retries:
@@ -97,7 +98,6 @@ def fetch_movies(language_code: str, year: int = 2024, max_retries: int = MAX_RE
         genres = extract_names(details.get('genres', []), 'name')
         return {
             'title': movie.get('title'),
-            'overview': movie.get('overview'),
             'rating': movie.get('vote_average'),
             'release_date': movie.get('release_date'),
             'original_language': movie.get('original_language'),
@@ -121,10 +121,10 @@ def fetch_movies(language_code: str, year: int = 2024, max_retries: int = MAX_RE
 
     return movies
 
-def fetch_and_save_movies(language_code: str, output_file: Optional[str] = None, output_dir: str = "results") -> None:
+def fetch_and_save_movies(language_code: str, output_file: Optional[str] = None, output_dir: str = "raw_data") -> None:
     start_time = time.time()
     if not output_file:
-        output_file = f"{language_code}_movies_simple.csv"
+        output_file = f"{language_code}_movies_{FILTER_YEAR}.csv"
     output_path = os.path.join(output_dir, output_file)
     movies = fetch_movies(language_code)
     save_movies_to_csv(movies, output_path)
@@ -133,7 +133,7 @@ def fetch_and_save_movies(language_code: str, output_file: Optional[str] = None,
     print(f"[INFO] Total time taken to fetch and save movies for '{language_code}': {total_time:.2f} seconds")
 
 def main():
-    languages = ['ja']
+    languages = ['hi', 'ko', 'jp', 'th', 'tl']
     for lang in languages:
         print("="*40)
         fetch_and_save_movies(lang)

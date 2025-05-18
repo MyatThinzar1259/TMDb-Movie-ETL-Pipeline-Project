@@ -1,5 +1,6 @@
 .env
 de_env
 venv
-results
+raw_data
+clean_data
 __pycache__/
