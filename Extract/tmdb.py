@@ -21,7 +21,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler("logs/movie_fetch.log", encoding='utf-8'),
+        logging.FileHandler("logs/asia_movie_fetch.log", encoding='utf-8'),
         logging.StreamHandler()
     ]
 )

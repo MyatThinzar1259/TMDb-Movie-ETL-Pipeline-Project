@@ -2,11 +2,24 @@ import requests
 from bs4 import BeautifulSoup
 import os
 from typing import List, Dict, Optional
+import logging
 from utils_csv import save_movies_to_csv
 
 WIKI_URL = 'https://en.wikipedia.org/wiki/List_of_American_films_of_2024'
 OUTPUT_DIR = "raw_data"
 OUTPUT_FILE = "american_movies_2024.csv"
+
+# Configure logging
+os.makedirs("logs", exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler("logs/hw_movie_fetch.log", encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 def fetch_wikipedia_page(url: str) -> Optional[BeautifulSoup]:
     try:
@@ -14,7 +27,7 @@ def fetch_wikipedia_page(url: str) -> Optional[BeautifulSoup]:
         response.raise_for_status()
         return BeautifulSoup(response.content, 'html.parser')
     except requests.RequestException as e:
-        print(f"[ERROR] Failed to fetch Wikipedia page: {e}")
+        logging.error(f"Failed to fetch Wikipedia page: {e}") 
         return None
 
 def extract_movies_from_tables(soup: BeautifulSoup) -> List[Dict[str, str]]:
@@ -61,13 +74,13 @@ def extract_movies_from_tables(soup: BeautifulSoup) -> List[Dict[str, str]]:
     return all_movies
 
 def main():
-    print("[INFO] Fetching Wikipedia page...")
+    logging.info(" Fetching Wikipedia page...")
     soup = fetch_wikipedia_page(WIKI_URL)
     if not soup:
         return
-    print("[INFO] Extracting movies from tables...")
+    logging.info(" Extracting movies from tables...")
     movies = extract_movies_from_tables(soup)
-    print(f"[INFO] Extracted {len(movies)} movies.")
+    logging.info(f" Extracted {len(movies)} movies.")
     output_path = os.path.join(OUTPUT_DIR, OUTPUT_FILE)
     save_movies_to_csv(movies, output_path)
 
