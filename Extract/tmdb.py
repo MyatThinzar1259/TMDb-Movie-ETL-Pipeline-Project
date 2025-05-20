@@ -43,8 +43,8 @@ def make_request_with_retries(url: str, params: dict, timeout: int = 20, retries
                 logger.error(f"Max retries reached for URL: {url}")
                 return None
 
-
 def get_movie_details(movie_id: int) -> dict:
+    """Fetch basic movie details"""
     url = f"{BASE_URL}/movie/{movie_id}"
     params = {
         "api_key": API_KEY,
@@ -55,10 +55,53 @@ def get_movie_details(movie_id: int) -> dict:
         return {}
     return data
 
+def get_movie_credits(movie_id: int) -> dict:
+    """Fetch credits (directors and actors) for a movie"""
+    url = f"{BASE_URL}/movie/{movie_id}/credits"
+    params = {
+        "api_key": API_KEY,
+        "language": "en-US"
+    }
+    data = make_request_with_retries(url, params, retry_delay=3)
+    if data is None:
+        return {"directors": [], "actors": []}
+    
+    # Extract directors
+    directors = [
+        person["name"] 
+        for person in data.get("crew", []) 
+        if person.get("job") == "Director"
+    ]
+    
+    # Extract top 5 main actors with their characters
+    actors = [
+        {"name": person["name"], "character": person["character"]}
+        for person in data.get("cast", [])[:5]  # Get top 5 actors
+    ]
+    
+    return {
+        "directors": directors,
+        "actors": actors
+    }
+
+def get_movie_full_details(movie_id: int) -> dict:
+    """Combine basic details and credits into one response"""
+    details = get_movie_details(movie_id)
+    credits = get_movie_credits(movie_id)
+    
+    return {
+        **details,
+        "directors": credits["directors"],
+        "actors": credits["actors"]
+    }
 
 def extract_names(items: list, key: str) -> str:
+    """Helper to extract names from nested objects"""
     return ', '.join(item.get(key, '') for item in items if item.get(key))
 
+def format_actors(actors: List[Dict]) -> str:
+    """Format actors list as 'Name (Character); Name (Character)'"""
+    return '; '.join([f"{a['name']} ({a['character']})" for a in actors])
 
 def fetch_movies(language_code: str) -> List[Dict]:
     movies = []
@@ -98,25 +141,30 @@ def fetch_movies(language_code: str) -> List[Dict]:
     # Step 2: Fetch movie details in parallel
     def fetch_details(movie_tuple):
         movie, movie_id = movie_tuple
-        details = get_movie_details(movie_id)
+        details = get_movie_full_details(movie_id)
+        
         production_companies = extract_names(details.get('production_companies', []), 'name')
         genres = extract_names(details.get('genres', []), 'name')
+        
         return {
+            'tmdb_id': movie_id,
             'title': movie.get('title'),
+            'budget': details.get('budget'),
+            'revenue' : details.get('revenue'),
             'rating': movie.get('vote_average'),
+            'vote_count': movie.get('vote_count'),
             'release_date': movie.get('release_date'),
             'original_language': movie.get('original_language'),
             'production_companies': production_companies,
-            'genres': genres
+            'genres': genres,
+            'directors': ', '.join(details.get('directors', [])),
+            'actors': format_actors(details.get('actors', [])),
+            'runtime': details.get('runtime')
         }
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = []
-
-        for tup in movie_ids:
-            future = executor.submit(fetch_details, tup)
-            futures.append(future)
-
+        futures = [executor.submit(fetch_details, tup) for tup in movie_ids]
+        
         for future in as_completed(futures):
             try:
                 result = future.result()
@@ -125,7 +173,6 @@ def fetch_movies(language_code: str) -> List[Dict]:
                 logger.error(f"Exception occurred during detail fetch: {exc}")
 
     return movies
-
 
 def fetch_and_save_movies(language_code: str, output_file: Optional[str] = None, output_dir: str = "raw_data") -> None:
     start_time = time.time()
@@ -140,14 +187,12 @@ def fetch_and_save_movies(language_code: str, output_file: Optional[str] = None,
     total_time = end_time - start_time
     logger.info(f"Total time taken to fetch and save movies for '{language_code}': {total_time:.2f} seconds")
 
-
 def main():
     languages = ['hi', 'ko', 'jp', 'th', 'tl']
     for lang in languages:
         logger.info("=" * 40)
         fetch_and_save_movies(lang)
         logger.info("=" * 40)
-
 
 if __name__ == "__main__":
     main()
