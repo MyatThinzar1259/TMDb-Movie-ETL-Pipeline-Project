@@ -4,4 +4,5 @@ venv
 raw_data
 clean_data
 Flow Chart
+logs
 __pycache__/
