@@ -5,8 +5,7 @@ from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from api_client import TMDbAPIClient
-from utils_csv import save_movies_to_csv
-from utils_tmdb import extract_names, format_actors
+from utils import save_movies_to_csv, extract_names, format_actors
 
 # Constants
 FILTER_YEAR = 2024
@@ -131,7 +130,7 @@ def fetch_and_save_movies(
 
 def main():
     """Main function"""
-    languages = ['en']  # Add more languages as needed: ['hi', 'ko', 'jp', 'th', 'tl']
+    languages = ['ko', 'ja', 'th', 'tl']  # Add more languages as needed: ['hi', 'ko', 'jp', 'th', 'tl']
 
     for lang in languages:
         logger.info("=" * 40)

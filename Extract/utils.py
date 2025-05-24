@@ -27,3 +27,9 @@ def save_movies_to_csv(
     except Exception as e:
         print(f"[ERROR] Failed to save CSV: {e}")
         return False
+    
+def extract_names(items: list, key: str) -> str:
+    return ', '.join(item.get(key, '') for item in items if item.get(key))
+
+def format_actors(actors: list) -> str:
+    return '; '.join([f"{a['name']} ({a.get('character', '')})" for a in actors if a.get('name')])

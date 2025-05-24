@@ -7,8 +7,7 @@ from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from api_client import TMDbAPIClient
-from utils_csv import save_movies_to_csv
-from utils_tmdb import extract_names, format_actors
+from utils import save_movies_to_csv, extract_names, format_actors
 
 # Constants
 WIKI_URL = 'https://en.wikipedia.org/wiki/List_of_American_films_of_2024'
