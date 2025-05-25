@@ -3,7 +3,6 @@ import time
 import logging
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 from api_client import TMDbAPIClient
 from utils import save_movies_to_csv, extract_names, format_actors
 
@@ -74,6 +73,7 @@ class TMDbMovieFetcher:
 
         production_companies = extract_names(details.get('production_companies', []), 'name')
         genres = extract_names(details.get('genres', []), 'name')
+        actors = format_actors(details.get('actors',[]))
 
         return {
             'tmdb_id': movie_id,
@@ -87,7 +87,7 @@ class TMDbMovieFetcher:
             'production_companies': production_companies,
             'genres': genres,
             'directors': ', '.join(details.get('directors', [])),
-            'actors': format_actors(details.get('actors', [])),
+            'actors': actors,
             'runtime': details.get('runtime')
         }
 
@@ -111,7 +111,7 @@ class TMDbMovieFetcher:
 def fetch_and_save_movies(
     language_code: str,
     output_file: Optional[str] = None,
-    output_dir: str = "raw_data"
+    output_dir: str = "Data/raw_data"
 ) -> None:
     """Fetch movies and save to CSV"""
     start_time = time.time()
@@ -130,7 +130,7 @@ def fetch_and_save_movies(
 
 def main():
     """Main function"""
-    languages = ['ko', 'ja', 'th', 'tl']  # Add more languages as needed: ['hi', 'ko', 'jp', 'th', 'tl']
+    languages = ['hi', 'ko', 'jp', 'th', 'tl']  # Add more languages as needed: ['hi', 'ko', 'jp', 'th', 'tl']
 
     for lang in languages:
         logger.info("=" * 40)

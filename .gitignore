@@ -1,8 +1,7 @@
 .env
 de_env
 venv
-raw_data
-clean_data
+Data
 Flow_Chart
 logs
 __pycache__/

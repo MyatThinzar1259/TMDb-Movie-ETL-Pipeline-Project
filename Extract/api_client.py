@@ -47,7 +47,7 @@ class TMDbAPIClient:
             "api_key": self.api_key,
             "language": "en-US"
         }
-        data = self.make_request_with_retries(url, params, retry_delay=3)
+        data = self.make_request_with_retries(url, params)
         return data if data is not None else {}
 
     def get_movie_credits(self, movie_id: int) -> Dict:
@@ -68,12 +68,15 @@ class TMDbAPIClient:
             for person in data.get("crew", [])
             if person.get("job") == "Director"
         ]
-
+        
         # Extract top 5 main actors with their characters
         actors = [
-            {"name": person["name"], "character": person["character"]}
+            {
+                "name": person["name"],
+                "character": person["character"]
+            }
             for person in data.get("cast", [])[:5]
-        ]
+        ]   
 
         return {
             "directors": directors,
@@ -112,7 +115,7 @@ class TMDbAPIClient:
                 movie_id = data["results"][0].get("id")
                 if movie_id:
                     self.logger.info(f"Fetching TMDb details for movie ID: {movie_id} ({title})")
-                    return self.get_movie_details(movie_id)
+                    return self.get_movie_full_details(movie_id)
             return None
         except Exception as e:
             self.logger.error(f"TMDb API error for '{title}': {e}")

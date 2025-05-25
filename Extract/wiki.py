@@ -11,8 +11,8 @@ from utils import save_movies_to_csv, extract_names, format_actors
 
 # Constants
 WIKI_URL = 'https://en.wikipedia.org/wiki/List_of_American_films_of_2024'
-OUTPUT_DIR = "raw_data"
-OUTPUT_FILE = "american_movies_2024.csv"
+OUTPUT_DIR = "Data/raw_data"
+OUTPUT_FILE = "en_movies_2024.csv"
 MAX_WORKERS = 20
 
 # Configure logging
@@ -111,12 +111,7 @@ class WikipediaMovieScraper:
         if tmdb_data:
             production_companies = extract_names(tmdb_data.get('production_companies', []), 'name')
             genres = extract_names(tmdb_data.get('genres', []), 'name')
-
-            # Fetch credits
-            movie_id = tmdb_data.get('id')
-            credits = self.api_client.get_movie_credits(movie_id) if movie_id else {"directors": [], "actors": []}
-            directors = ', '.join(credits.get('directors', []))
-            actors = format_actors(credits.get('actors', []))
+            actors = format_actors(tmdb_data.get('actors',[]))
 
             return {
                 'tmdb_id': tmdb_data.get('id'),
@@ -129,7 +124,7 @@ class WikipediaMovieScraper:
                 'original_language': tmdb_data.get('original_language'),
                 'production_companies': production_companies,
                 'genres': genres,
-                'directors': directors,
+                'directors': ','.join(tmdb_data.get('directors', [])),
                 'actors': actors,
                 'runtime': tmdb_data.get('runtime')
             }
