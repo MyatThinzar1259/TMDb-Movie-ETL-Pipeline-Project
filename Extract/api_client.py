@@ -1,7 +1,8 @@
 import os
-import time
 import logging
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from typing import Optional, Dict, List
 from dotenv import load_dotenv
 
@@ -14,31 +15,34 @@ class TMDbAPIClient:
     def __init__(self):
         self.api_key = os.getenv("API_KEY")
         self.base_url = "https://api.themoviedb.org/3"
-        self.max_retries = 3
         self.logger = logging.getLogger(__name__)
 
-    def make_request_with_retries(
-        self,
-        url: str,
-        params: Dict,
-        timeout: int = 20,
-        retry_delay: int = 3
-    ) -> Optional[Dict]:
-        """Make HTTP request with retry logic"""
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                self.logger.info(f"Fetching URL: {url} (Attempt {attempt}/{self.max_retries})")
-                response = requests.get(url, params=params, timeout=timeout)
-                response.raise_for_status()
-                return response.json()
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"Request failed on attempt {attempt}: {e}")
-                if attempt < self.max_retries:
-                    self.logger.info(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
-                else:
-                    self.logger.error(f"Max retries reached for URL: {url}")
-                    return None
+        # Create session with retry strategy and connection pooling
+        self.session = requests.Session()
+        retry = Retry(
+            total=3,
+            connect=3,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504]
+        )
+        adapter = HTTPAdapter(
+            max_retries=retry,
+            pool_connections=20,  # Number of connection pools
+            pool_maxsize=20,      # Maximum number of connections in pool
+            pool_block=False      # Don't block when pool is full
+        )
+        self.session.mount('https://', adapter)
+
+    def make_request_with_retries(self, url: str, params: Dict) -> Optional[Dict]:
+        """Make HTTP request with retry logic using session"""
+        try:
+            self.logger.info(f"Fetching URL: {url}")
+            response = self.session.get(url, params=params)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Request failed: {e}")
+            return None
 
     def get_movie_details(self, movie_id: int) -> Dict:
         """Fetch basic movie details"""
@@ -57,7 +61,7 @@ class TMDbAPIClient:
             "api_key": self.api_key,
             "language": "en-US"
         }
-        data = self.make_request_with_retries(url, params, retry_delay=3)
+        data = self.make_request_with_retries(url, params)
 
         if data is None:
             return {"directors": [], "actors": []}
@@ -107,7 +111,7 @@ class TMDbAPIClient:
 
         try:
             self.logger.info(f"Searching TMDb for: {title}")
-            response = requests.get(search_url, params=params, timeout=10)
+            response = self.session.get(search_url, params=params)
             response.raise_for_status()
             data = response.json()
 
@@ -120,3 +124,8 @@ class TMDbAPIClient:
         except Exception as e:
             self.logger.error(f"TMDb API error for '{title}': {e}")
             return None
+
+    def __del__(self):
+        """Clean up session on object deletion"""
+        if hasattr(self, 'session'):
+            self.session.close()
