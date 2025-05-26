@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from api_client import TMDbAPIClient
 from utils import save_movies_to_csv, extract_names, format_actors
+from utils_date import convert_movie_date
 
 # Constants
 WIKI_URL = 'https://en.wikipedia.org/wiki/List_of_American_films_of_2024'
@@ -120,7 +121,7 @@ class WikipediaMovieScraper:
                 'revenue': tmdb_data.get('revenue'),
                 'rating': tmdb_data.get('vote_average'),
                 'vote_count': tmdb_data.get('vote_count'),
-                'release_date': tmdb_data.get('release_date') or movie.get('Release Date'),
+                'release_date': tmdb_data.get('release_date') or convert_movie_date(movie.get('Release Date')),
                 'original_language': tmdb_data.get('original_language'),
                 'production_companies': production_companies,
                 'genres': genres,

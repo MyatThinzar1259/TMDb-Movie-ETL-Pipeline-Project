@@ -34,7 +34,7 @@ def clean_text(text: str) -> str:
     if pd.isna(text):
         return ""
     # Remove special characters except alphanumeric, spaces, and basic punctuation
-    text = re.sub(r'[^\w\s.,-]', '', text)
+    text = re.sub(r'[^\w\s.,&-]', '', text)
     # Collapse multiple spaces into one
     text = re.sub(r'\s+', ' ', text).strip()
     return text

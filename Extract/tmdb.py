@@ -50,7 +50,7 @@ class TMDbMovieFetcher:
                 'primary_release_date.lte': f'{FILTER_YEAR}-12-31'
             }
 
-            data = self.api_client.make_request_with_retries(url, params, retry_delay=5)
+            data = self.api_client.make_request_with_retries(url, params)
             if data is None:
                 break
 

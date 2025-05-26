@@ -6,52 +6,83 @@ from utils_transformer import (
     load_csv_to_dataframe,
     save_dataframe_to_csv,
     clean_text,
-    parse_date
+    parse_date,
+    standardize_language_code
 )
 
-def transform_wiki_data(input_path: str, output_dir: str = "clean_data") -> Optional[pd.DataFrame]:
+def transform_wiki_data(input_path: str, output_dir: str = "Data/clean_data") -> Optional[pd.DataFrame]:
     """Transform Wikipedia data from raw to clean format."""
-    # Load raw data
-    df = load_csv_to_dataframe(input_path)
-    if df is None or df.empty:
-        return None
-    
-    # Apply transformations
-    df['Title'] = df['Title'].apply(clean_text)
-    df['Studio'] = df['Studio'].apply(clean_text)
-    df['Cast and Crew'] = df['Cast and Crew'].apply(clean_text)
-    
-    # Parse and standardize release date
-    def parse_wiki_date(date_str):
-        if pd.isna(date_str):
+    try:
+        # Load raw data
+        df = load_csv_to_dataframe(input_path)
+        if df is None or df.empty:
+            print("[ERROR] No data loaded or empty DataFrame")
             return None
+        
+        # Remove rows where 'tmdb_id' is missing
+        df = df.dropna(subset=['tmdb_id'])
+
+        # Clean text fields
+        text_columns = ['title','production_companies', 'genres', 'directors', 'actors']
+        for col in text_columns:
+            if col in df.columns:
+                df[col] = df[col].apply(clean_text)
+        
+        
+        df['rating'] = df['rating'].round(1)
+        df['vote_count'] = pd.to_numeric(df['vote_count'], errors='coerce')
+        df['runtime'] = pd.to_numeric(df['runtime'], errors='coerce')
+        df['release_date'] = df['release_date'].apply(parse_date)
+        df['original_language'] = df['original_language'].apply(standardize_language_code)
+  
+        # Select and rename columns
+        output_columns = [
+            'tmdb_id', 'title', 'release_date',
+            'rating', 'vote_count', 'budget', 'revenue', 'runtime',
+            'production_companies', 'genres', 'directors', 'actors',
+            'original_language'
+        ]
+        
+        # Only keep columns that exist in the dataframe
+        df = df[[col for col in output_columns if col in df.columns]]
+        
+        # Standardize column names
+        df = df.rename(columns={
+            'title': 'Title',
+            'production_companies': 'ProductionCompanies',
+            'original_language': 'OriginalLanguage',
+            'vote_count': 'VoteCount',
+            'release_date': 'ReleaseDate'
+        })
+        
+        # Add source column
+        df['Source'] = df['tmdb_id'].apply(lambda x: 'TMDb' if pd.notna(x) else 'Wikipedia')
+        
+        # Save transformed data
+        output_filename = "clean_wiki_tmdb_en_movies_2024.csv"
+        output_path = os.path.join(output_dir, output_filename)
+        
+        # Try alternative save method if permission denied
         try:
-            # Example format: "15, January"
-            date_part, month_part = date_str.split(', ')
-            date_obj = datetime.strptime(f"{date_part} {month_part} 2024", "%d %B %Y")
-            return date_obj.strftime("%Y-%m-%d")
-        except (ValueError, AttributeError):
-            return None
+            save_dataframe_to_csv(df, output_path)
+        except PermissionError:
+            # Try saving to current directory if target directory fails
+            alt_path = os.path.join(os.getcwd(), output_filename)
+            print(f"[WARNING] Could not save to {output_path}, trying {alt_path}")
+            save_dataframe_to_csv(df, alt_path)
+            return df
+        
+        return df
     
-    df['ReleaseDate'] = df['Release Date'].apply(parse_wiki_date)
-    
-    # Select and rename columns
-    df = df[['Title', 'Studio', 'Cast and Crew', 'ReleaseDate']]
-    df = df.rename(columns={
-        'Cast and Crew': 'CastCrew'
-    })
-    
-    # Add source column
-    df['Source'] = 'Wikipedia'
-    
-    # Save transformed data
-    output_filename = "clean_wiki_american_movies.csv"
-    output_path = os.path.join(output_dir, output_filename)
-    save_dataframe_to_csv(df, output_path)
-    
-    return df
+    except Exception as e:
+        print(f"[ERROR] Transformation failed: {str(e)}")
+        return None
 
 if __name__ == "__main__":
-    input_path = os.path.join("raw_data", "american_movies_2024.csv")
-    print("\n[INFO] Processing Wikipedia file")
-    transform_wiki_data(input_path)
+    input_path = os.path.join("Data", "raw_data", "en_movies_2024.csv")
+    print("\n[INFO] Processing Wikipedia/TMDb combined file")
+    result = transform_wiki_data(input_path)
+    if result is not None:
+        print("[SUCCESS] Data transformation completed")
+    else:
+        print("[ERROR] Data transformation failed")
