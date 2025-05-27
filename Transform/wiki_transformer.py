@@ -19,6 +19,10 @@ def transform_wiki_data(input_path: str, output_dir: str = "Data/clean_data") ->
             print("[ERROR] No data loaded or empty DataFrame")
             return None
 
+        # Filter out rows where is_data_updated is present and False
+        if 'is_data_updated' in df.columns:
+            df = df[df['is_data_updated'].astype(str).str.lower() != 'false']
+
         # Remove rows where 'tmdb_id' is missing
         df = df.dropna(subset=['tmdb_id'])
 

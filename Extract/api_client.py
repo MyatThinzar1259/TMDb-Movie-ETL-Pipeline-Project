@@ -107,7 +107,7 @@ class TMDbAPIClient:
             "language": "en-US",
             "page": 1,
             "include_adult": False,
-            "year": year
+            "primary_release_year": year
         }
 
         try:

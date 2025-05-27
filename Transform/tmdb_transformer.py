@@ -13,12 +13,16 @@ def transform_tmdb_data(input_path: str, output_dir: str = "Data/clean_data") ->
     """Transform TMDB data from raw to clean format."""
     # Extract language code from filename
     lang_code = os.path.basename(input_path).split('_')[0]
-    
+
     # Load raw data
     df = load_csv_to_dataframe(input_path)
     if df is None or df.empty:
         return None
-    
+
+    # Filter out rows where is_data_updated is present and False
+    if 'is_data_updated' in df.columns:
+        df = df[df['is_data_updated'].astype(str).str.lower() != 'false']
+
     # Apply transformations
     df['title'] = df['title'].apply(clean_text)
     df['rating'] = df['rating'].round(1)
@@ -27,12 +31,12 @@ def transform_tmdb_data(input_path: str, output_dir: str = "Data/clean_data") ->
     df['production_companies'] = df['production_companies'].apply(clean_text)
     df['genres'] = df['genres'].apply(clean_text)
     df['source'] = 'TMDB'
-    
+
     # Save transformed data
     output_filename = f"clean_tmdb_{lang_code}_movies_2024.csv"
     output_path = os.path.join(output_dir, output_filename)
     save_dataframe_to_csv(df, output_path)
-    
+
     return df
 
 def process_all_tmdb_files(input_dir: str = "Data/raw_data", output_dir: str = "Data/clean_data"):
@@ -40,7 +44,7 @@ def process_all_tmdb_files(input_dir: str = "Data/raw_data", output_dir: str = "
     if not os.path.exists(input_dir):
         print(f"[ERROR] Input directory {input_dir} does not exist")
         return
-    
+
     for filename in os.listdir(input_dir):
         if filename.endswith(".csv") and any(lang in filename for lang in ['hi', 'ko', 'jp', 'th', 'tl']):
             input_path = os.path.join(input_dir, filename)
