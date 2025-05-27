@@ -106,8 +106,20 @@ class WikipediaMovieScraper:
 
     def enrich_movie_with_tmdb(self, movie: Dict[str, str]) -> Dict:
         """Enrich Wikipedia movie data with TMDb information"""
+        # Extract year from release date if possible
+        release_date = movie.get('Release Date')
+        year = None
+        if release_date:
+            # Try to extract a 4-digit year from the release date string
+            import re
+            match = re.search(r'\b(20\d{2})\b', release_date)
+            if match:
+                year = int(match.group(1))
+            else:
+                year = 2024  # fallback to 2024 if not found
+
         logger.info(f"Fetching TMDb data for movie: {movie['Title']}")
-        tmdb_data = self.api_client.search_movie_by_title(movie['Title'])
+        tmdb_data = self.api_client.search_movie_by_title(movie['Title'], year=year)
 
         if tmdb_data:
             production_companies = extract_names(tmdb_data.get('production_companies', []), 'name')
@@ -138,7 +150,7 @@ class WikipediaMovieScraper:
                 'revenue': None,
                 'rating': None,
                 'vote_count': None,
-                'release_date': movie.get('Release Date'),
+                'release_date': convert_movie_date(movie.get('Release Date')),
                 'original_language': None,
                 'production_companies': "",
                 'genres': "",

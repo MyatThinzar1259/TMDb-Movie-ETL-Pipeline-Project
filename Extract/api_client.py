@@ -27,8 +27,8 @@ class TMDbAPIClient:
         )
         adapter = HTTPAdapter(
             max_retries=retry,
-            pool_connections=20,  # Number of connection pools
-            pool_maxsize=20,      # Maximum number of connections in pool
+            pool_connections=50,  # Match to ThreadPoolExecutor max_workers
+            pool_maxsize=50,      # Match to ThreadPoolExecutor max_workers
             pool_block=False      # Don't block when pool is full
         )
         self.session.mount('https://', adapter)
@@ -98,22 +98,27 @@ class TMDbAPIClient:
             "actors": credits["actors"]
         }
 
-    def search_movie_by_title(self, title: str) -> Optional[Dict]:
-        """Search TMDb for a movie by title and return detailed info"""
+    def search_movie_by_title(self, title: str, year: int) -> Optional[Dict]:
+        """Search TMDb for a movie by title (and optionally year) and return detailed info"""
         search_url = f"{self.base_url}/search/movie"
         params = {
             "api_key": self.api_key,
             "query": title,
             "language": "en-US",
             "page": 1,
-            "include_adult": False
+            "include_adult": False,
+            "year": year
         }
 
         try:
-            self.logger.info(f"Searching TMDb for: {title}")
+            self.logger.info(f"Searching TMDb for: {title}" + (f" ({year})" if year else ""))
             response = self.session.get(search_url, params=params)
             response.raise_for_status()
             data = response.json()
+
+            if not data.get("results"):
+                self.logger.warning(f"No results found for '{title}'")
+                return None
 
             if data.get("results"):
                 movie_id = data["results"][0].get("id")

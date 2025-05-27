@@ -9,7 +9,7 @@ from utils import save_movies_to_csv, extract_names, format_actors, load_movies_
 # Constants
 FILTER_YEAR = 2024
 MAX_PAGES = 10
-MAX_WORKERS = 50
+MAX_WORKERS = 50  # Match this to the connection pool size in api_client.py
 
 # Configure logging
 os.makedirs("logs", exist_ok=True)
