@@ -3,5 +3,8 @@ de_env
 venv
 Data
 Flow_Chart
+PostgresSql
+Power_BI
+Power_BI
 logs
 __pycache__/
