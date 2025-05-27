@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from api_client import TMDbAPIClient
-from utils import save_movies_to_csv, extract_names, format_actors
+from utils import save_movies_to_csv, extract_names, format_actors, load_movies_from_csv, compare_movie_records
 
 # Constants
 FILTER_YEAR = 2024
@@ -122,6 +122,25 @@ def fetch_and_save_movies(
 
     fetcher = TMDbMovieFetcher()
     movies = fetcher.fetch_movies(language_code)
+
+    # Load previous data
+    prev_movies = load_movies_from_csv(output_path)
+    prev_map = {}
+    for m in prev_movies:
+        key = m.get('tmdb_id')
+        prev_map[key] = m
+
+    compare_keys = [
+        'title', 'budget', 'revenue', 'rating', 'vote_count', 'genres'
+    ]
+    for m in movies:
+        key = m.get('tmdb_id')
+        old = prev_map.get(str(key))
+        if old:
+            m['is_data_updated'] = compare_movie_records(m, old, compare_keys)
+        else:
+            m['is_data_updated'] = True
+
     save_movies_to_csv(movies, output_path)
 
     end_time = time.time()
@@ -130,7 +149,7 @@ def fetch_and_save_movies(
 
 def main():
     """Main function"""
-    languages = ['hi', 'ko', 'jp', 'th', 'tl']  # Add more languages as needed: ['hi', 'ko', 'jp', 'th', 'tl']
+    languages = ['hi']  # Add more languages as needed: ['hi', 'ko', 'jp', 'th', 'tl']
 
     for lang in languages:
         logger.info("=" * 40)

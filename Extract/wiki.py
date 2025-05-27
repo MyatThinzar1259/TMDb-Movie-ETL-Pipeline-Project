@@ -7,7 +7,7 @@ from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from api_client import TMDbAPIClient
-from utils import save_movies_to_csv, extract_names, format_actors
+from utils import save_movies_to_csv, extract_names, format_actors, load_movies_from_csv, compare_movie_records
 from utils_date import convert_movie_date
 
 # Constants
@@ -182,6 +182,25 @@ def main():
 
     logger.info(f"Extracted {len(movies)} movies.")
     output_path = os.path.join(OUTPUT_DIR, OUTPUT_FILE)
+
+    # Load previous data
+    prev_movies = load_movies_from_csv(output_path)
+    prev_map = {}
+    for m in prev_movies:
+        key = m.get('tmdb_id')
+        prev_map[key] = m
+
+    compare_keys = [
+        'title', 'budget', 'revenue', 'rating', 'vote_count', 'genres'
+    ]
+    for m in movies:
+        key = m.get('tmdb_id')
+        old = prev_map.get(str(key))
+        if old:
+            m['is_data_updated'] = compare_movie_records(m, old, compare_keys)
+        else:
+            m['is_data_updated'] = True
+
     save_movies_to_csv(movies, output_path)
     logger.info(f"Saved movies to {output_path}")
 

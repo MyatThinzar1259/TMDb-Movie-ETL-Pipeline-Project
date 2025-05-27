@@ -27,8 +27,8 @@ class TMDbAPIClient:
         )
         adapter = HTTPAdapter(
             max_retries=retry,
-            pool_connections=50,  # Number of connection pools
-            pool_maxsize=50,      # Maximum number of connections in pool
+            pool_connections=20,  # Number of connection pools
+            pool_maxsize=20,      # Maximum number of connections in pool
             pool_block=False      # Don't block when pool is full
         )
         self.session.mount('https://', adapter)
@@ -72,7 +72,7 @@ class TMDbAPIClient:
             for person in data.get("crew", [])
             if person.get("job") == "Director"
         ]
-        
+
         # Extract top 5 main actors with their characters
         actors = [
             {
@@ -80,7 +80,7 @@ class TMDbAPIClient:
                 "character": person["character"]
             }
             for person in data.get("cast", [])[:5]
-        ]   
+        ]
 
         return {
             "directors": directors,
