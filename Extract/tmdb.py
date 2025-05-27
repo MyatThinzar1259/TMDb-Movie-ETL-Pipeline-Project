@@ -4,12 +4,13 @@ import logging
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from api_client import TMDbAPIClient
-from utils import save_movies_to_csv, extract_names, format_actors
+from utils import save_movies_to_csv, extract_names, format_actors, load_movies_from_csv, compare_movie_records
 
 # Constants
 FILTER_YEAR = 2024
 MAX_PAGES = 10
-MAX_WORKERS = 50
+MAX_WORKERS = 50  # Match this to the connection pool size in api_client.py
+OUTPUT_DIR = "Data/raw_data/tmdb/"
 
 # Configure logging
 os.makedirs("logs", exist_ok=True)
@@ -108,20 +109,34 @@ class TMDbMovieFetcher:
 
         return movies
 
-def fetch_and_save_movies(
-    language_code: str,
-    output_file: Optional[str] = None,
-    output_dir: str = "Data/raw_data"
-) -> None:
+def fetch_and_save_movies(language_code: str) -> None:
     """Fetch movies and save to CSV"""
     start_time = time.time()
 
-    if not output_file:
-        output_file = f"{language_code}_movies_{FILTER_YEAR}.csv"
-    output_path = os.path.join(output_dir, output_file)
+    output_file = f"{language_code}_movies_{FILTER_YEAR}.csv"
+    output_path = os.path.join(OUTPUT_DIR, output_file)
 
     fetcher = TMDbMovieFetcher()
     movies = fetcher.fetch_movies(language_code)
+
+    # Load previous data
+    prev_movies = load_movies_from_csv(output_path)
+    prev_map = {}
+    for m in prev_movies:
+        key = m.get('tmdb_id')
+        prev_map[key] = m
+
+    compare_keys = [
+        'title', 'budget', 'revenue', 'rating', 'vote_count', 'genres'
+    ]
+    for m in movies:
+        key = m.get('tmdb_id')
+        old = prev_map.get(str(key))
+        if old:
+            m['is_data_updated'] = compare_movie_records(m, old, compare_keys)
+        else:
+            m['is_data_updated'] = True
+
     save_movies_to_csv(movies, output_path)
 
     end_time = time.time()

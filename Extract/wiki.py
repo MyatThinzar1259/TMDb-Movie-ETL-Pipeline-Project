@@ -7,12 +7,12 @@ from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from api_client import TMDbAPIClient
-from utils import save_movies_to_csv, extract_names, format_actors
+from utils import save_movies_to_csv, extract_names, format_actors, load_movies_from_csv, compare_movie_records
 from utils_date import convert_movie_date
 
 # Constants
 WIKI_URL = 'https://en.wikipedia.org/wiki/List_of_American_films_of_2024'
-OUTPUT_DIR = "Data/raw_data"
+OUTPUT_DIR = "Data/raw_data/wiki/"
 OUTPUT_FILE = "en_movies_2024.csv"
 MAX_WORKERS = 20
 
@@ -106,46 +106,43 @@ class WikipediaMovieScraper:
 
     def enrich_movie_with_tmdb(self, movie: Dict[str, str]) -> Dict:
         """Enrich Wikipedia movie data with TMDb information"""
+        # Extract year from release date if possible
+        release_date = movie.get('Release Date')
+        year = None
+        if release_date:
+            # Try to extract a 4-digit year from the release date string
+            import re
+            match = re.search(r'\b(20\d{2})\b', release_date)
+            if match:
+                year = int(match.group(1))
+            else:
+                year = 2024  # fallback to 2024 if not found
+
         logger.info(f"Fetching TMDb data for movie: {movie['Title']}")
-        tmdb_data = self.api_client.search_movie_by_title(movie['Title'])
+        tmdb_data = self.api_client.search_movie_by_title(movie['Title'], year=year)
 
-        if tmdb_data:
-            production_companies = extract_names(tmdb_data.get('production_companies', []), 'name')
-            genres = extract_names(tmdb_data.get('genres', []), 'name')
-            actors = format_actors(tmdb_data.get('actors',[]))
+        if not tmdb_data:
+            return {}  # Return empty if tmdb_data is empty
 
-            return {
-                'tmdb_id': tmdb_data.get('id'),
-                'title': movie.get('Title'),
-                'budget': tmdb_data.get('budget'),
-                'revenue': tmdb_data.get('revenue'),
-                'rating': tmdb_data.get('vote_average'),
-                'vote_count': tmdb_data.get('vote_count'),
-                'release_date': tmdb_data.get('release_date') or convert_movie_date(movie.get('Release Date')),
-                'original_language': tmdb_data.get('original_language'),
-                'production_companies': production_companies,
-                'genres': genres,
-                'directors': ','.join(tmdb_data.get('directors', [])),
-                'actors': actors,
-                'runtime': tmdb_data.get('runtime')
-            }
-        else:
-            # Return basic structure with empty TMDb fields
-            return {
-                'tmdb_id': None,
-                'title': movie.get('Title'),
-                'budget': None,
-                'revenue': None,
-                'rating': None,
-                'vote_count': None,
-                'release_date': movie.get('Release Date'),
-                'original_language': None,
-                'production_companies': "",
-                'genres': "",
-                'directors': "",
-                'actors': "",
-                'runtime': None
-            }
+        production_companies = extract_names(tmdb_data.get('production_companies', []), 'name')
+        genres = extract_names(tmdb_data.get('genres', []), 'name')
+        actors = format_actors(tmdb_data.get('actors',[]))
+
+        return {
+            'tmdb_id': tmdb_data.get('id'),
+            'title': movie.get('Title'),
+            'budget': tmdb_data.get('budget'),
+            'revenue': tmdb_data.get('revenue'),
+            'rating': tmdb_data.get('vote_average'),
+            'vote_count': tmdb_data.get('vote_count'),
+            'release_date': tmdb_data.get('release_date') or convert_movie_date(movie.get('Release Date')),
+            'original_language': tmdb_data.get('original_language'),
+            'production_companies': production_companies,
+            'genres': genres,
+            'directors': ','.join(tmdb_data.get('directors', [])),
+            'actors': actors,
+            'runtime': tmdb_data.get('runtime')
+        }
 
     def process_movies(self, wiki_movies: List[Dict[str, str]]) -> List[Dict]:
         """Process all movies with TMDb enrichment using parallel execution"""
@@ -157,10 +154,11 @@ class WikipediaMovieScraper:
             for future in as_completed(futures):
                 try:
                     result = future.result()
-                    all_movies.append(result)
+                    if result:
+                        all_movies.append(result)
                 except Exception as exc:
                     logger.error(f"Exception occurred during TMDb fetch: {exc}")
-                time.sleep(0.25)  # Be polite to TMDb API
+                time.sleep(0.25)
 
         return all_movies
 
@@ -182,6 +180,25 @@ def main():
 
     logger.info(f"Extracted {len(movies)} movies.")
     output_path = os.path.join(OUTPUT_DIR, OUTPUT_FILE)
+
+    # Load previous data
+    prev_movies = load_movies_from_csv(output_path)
+    prev_map = {}
+    for m in prev_movies:
+        key = m.get('tmdb_id')
+        prev_map[key] = m
+
+    compare_keys = [
+        'title', 'budget', 'revenue', 'rating', 'vote_count', 'genres'
+    ]
+    for m in movies:
+        key = m.get('tmdb_id')
+        old = prev_map.get(str(key))
+        if old:
+            m['is_data_updated'] = compare_movie_records(m, old, compare_keys)
+        else:
+            m['is_data_updated'] = True
+
     save_movies_to_csv(movies, output_path)
     logger.info(f"Saved movies to {output_path}")
 
