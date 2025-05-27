@@ -45,7 +45,7 @@ def transform_wiki_data(input_path: str, output_dir: str = "Data/clean_data") ->
         df = df[[col for col in output_columns if col in df.columns]]
         
         # Add source column
-        df['source'] = 'Wikipedia'
+        df['source'] = df['tmdb_id'].apply(lambda x: 'TMDb' if pd.notna(x) else 'Wikipedia')
         
         # Save transformed data
         output_filename = "clean_en_movies_2024.csv"
@@ -67,7 +67,7 @@ def transform_wiki_data(input_path: str, output_dir: str = "Data/clean_data") ->
         print(f"[ERROR] Transformation failed: {str(e)}")
         return None
 
-if __name__ == "main":
+if __name__ == "__main__":
     input_path = os.path.join("Data", "raw_data", "en_movies_2024.csv")
     print("\n[INFO] Processing Wikipedia/TMDb combined file")
     result = transform_wiki_data(input_path)

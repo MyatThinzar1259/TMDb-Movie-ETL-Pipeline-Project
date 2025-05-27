@@ -42,7 +42,7 @@ def process_all_tmdb_files(input_dir: str = "Data/raw_data", output_dir: str = "
         return
     
     for filename in os.listdir(input_dir):
-        if filename.endswith(".csv") and any(lang in filename for lang in ['hi', 'ko', 'jp', 'th', 'tl']):
+        if filename.endswith(".csv") and any(lang in filename for lang in ['hi', 'ko', 'ja', 'th', 'tl']):
             input_path = os.path.join(input_dir, filename)
             print(f"\n[INFO] Processing TMDB file: {filename}")
             transform_tmdb_data(input_path, output_dir)

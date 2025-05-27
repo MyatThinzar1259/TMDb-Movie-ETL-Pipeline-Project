@@ -1,7 +1,6 @@
 import pandas as pd
 import json
 import os
-from uuid import uuid4
 
 # Directory containing your CSVs
 CSV_DIR = "Data/clean_data"
@@ -100,7 +99,7 @@ for lang in LANGUAGES:
 def write_json(data, filename):
     with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-        write_json(movies, "movies.json")
+write_json(movies, "movies.json")
 write_json(
     [{"company_id": v, "name": k} for k, v in production_companies.items()],
     "production_companies.json"
@@ -117,4 +116,4 @@ write_json(movie_company_links, "movie_company.json")
 write_json(movie_genre_links, "movie_genre.json")
 write_json(movie_person_links, "movie_person.json")
 
-print("✅ Normalization and JSON export complete.")
+print("Normalization and JSON export complete.")
