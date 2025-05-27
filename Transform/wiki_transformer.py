@@ -35,28 +35,17 @@ def transform_wiki_data(input_path: str, output_dir: str = "Data/clean_data") ->
         df['release_date'] = df['release_date'].apply(parse_date)
         df['original_language'] = df['original_language'].apply(standardize_language_code)
   
-        # Select and rename columns
         output_columns = [
-            'tmdb_id', 'title', 'release_date',
-            'rating', 'vote_count', 'budget', 'revenue', 'runtime',
-            'production_companies', 'genres', 'directors', 'actors',
-            'original_language'
+            'tmdb_id', 'title', 'budget', 'revenue',
+            'rating', 'release_date', 'original_language', 'production_companies',
+            'genres', 'directors', 'actors', 'vote_count', 'runtime'   
         ]
         
         # Only keep columns that exist in the dataframe
         df = df[[col for col in output_columns if col in df.columns]]
         
-        # Standardize column names
-        df = df.rename(columns={
-            'title': 'Title',
-            'production_companies': 'ProductionCompanies',
-            'original_language': 'OriginalLanguage',
-            'vote_count': 'VoteCount',
-            'release_date': 'ReleaseDate'
-        })
-        
         # Add source column
-        df['Source'] = df['tmdb_id'].apply(lambda x: 'TMDb' if pd.notna(x) else 'Wikipedia')
+        df['source'] = df['tmdb_id'].apply(lambda x: 'TMDb' if pd.notna(x) else 'Wikipedia')
         
         # Save transformed data
         output_filename = "clean_wiki_tmdb_en_movies_2024.csv"
