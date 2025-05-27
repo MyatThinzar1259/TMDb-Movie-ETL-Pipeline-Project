@@ -45,7 +45,7 @@ def transform_wiki_data(input_path: str, output_dir: str = "clean_data") -> Opti
     df['Source'] = 'Wikipedia'
     
     # Save transformed data
-    output_filename = "clean_wiki_american_movies.csv"
+    output_filename = "clean_en_movies_2024.csv"
     output_path = os.path.join(output_dir, output_filename)
     save_dataframe_to_csv(df, output_path)
     

@@ -28,7 +28,7 @@ def transform_tmdb_data(input_path: str, output_dir: str = "clean_data") -> Opti
     df['source'] = 'TMDB'
     
     # Save transformed data
-    output_filename = f"clean_tmdb_{lang_code}_movies_2024.csv"
+    output_filename = f"clean_{lang_code}_movies_2024.csv"
     output_path = os.path.join(output_dir, output_filename)
     save_dataframe_to_csv(df, output_path)
     
