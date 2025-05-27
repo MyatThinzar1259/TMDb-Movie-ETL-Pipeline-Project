@@ -33,9 +33,8 @@ def clean_text(text: str) -> str:
     """Clean text by removing special characters and extra whitespace."""
     if pd.isna(text):
         return ""
-    text = str(text)
     # Remove special characters except alphanumeric, spaces, and basic punctuation
-    text = re.sub(r'[^\w\s.,-]', '', text)
+    text = re.sub(r'[^\w\s.,&-]', '', text)
     # Collapse multiple spaces into one
     text = re.sub(r'\s+', ' ', text).strip()
     return text
@@ -57,6 +56,7 @@ def standardize_language_code(code: str) -> str:
         'ko': 'Korean',
         'jp': 'Japanese',
         'th': 'Thai',
-        'tl': 'Filipino'
+        'tl': 'Filipino',
+        'en': 'English'
     }
     return code_map.get(code.lower(), code.upper())

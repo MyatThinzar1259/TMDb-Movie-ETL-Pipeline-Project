@@ -9,7 +9,7 @@ from utils_transformer import (
     standardize_language_code
 )
 
-def transform_tmdb_data(input_path: str, output_dir: str = "clean_data") -> Optional[pd.DataFrame]:
+def transform_tmdb_data(input_path: str, output_dir: str = "Data/clean_data") -> Optional[pd.DataFrame]:
     """Transform TMDB data from raw to clean format."""
     # Extract language code from filename
     lang_code = os.path.basename(input_path).split('_')[0]
@@ -21,8 +21,9 @@ def transform_tmdb_data(input_path: str, output_dir: str = "clean_data") -> Opti
     
     # Apply transformations
     df['title'] = df['title'].apply(clean_text)
+    df['rating'] = df['rating'].round(1)
     df['original_language'] = df['original_language'].apply(standardize_language_code)
-    df['release_date'] = df['release_date'].apply(lambda x: parse_date(x) if pd.notna(x) else None)
+    df['release_date'] = df['release_date'].apply(parse_date)
     df['production_companies'] = df['production_companies'].apply(clean_text)
     df['genres'] = df['genres'].apply(clean_text)
     df['source'] = 'TMDB'
@@ -34,7 +35,7 @@ def transform_tmdb_data(input_path: str, output_dir: str = "clean_data") -> Opti
     
     return df
 
-def process_all_tmdb_files(input_dir: str = "raw_data", output_dir: str = "clean_data"):
+def process_all_tmdb_files(input_dir: str = "Data/raw_data", output_dir: str = "Data/clean_data"):
     """Process all TMDB CSV files in the input directory."""
     if not os.path.exists(input_dir):
         print(f"[ERROR] Input directory {input_dir} does not exist")
