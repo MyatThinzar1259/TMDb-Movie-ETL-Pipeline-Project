@@ -4,24 +4,72 @@ import psycopg2
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 
-load_dotenv()  # Load .env variables
+# Load DATABASE_URL from .env
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASS = os.getenv("DB_PASS")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT", 5432)
+DATA_DIR = "Data/json_to_load"
 
-DATA_DIR = "Data/load_data"  # where your JSON files are
+# Define SQL to create tables
+CREATE_TABLES_SQL = [
+    """
+    CREATE TABLE IF NOT EXISTS movie (
+        tmdb_id INTEGER PRIMARY KEY,
+        title TEXT,
+        budget INTEGER,
+        revenue INTEGER,
+        rating FLOAT,
+        vote_count INTEGER,
+        release_date DATE,
+        original_language TEXT,
+        runtime FLOAT,
+        source TEXT
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS production_company (
+        company_id TEXT PRIMARY KEY,
+        name TEXT
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS genre (
+        genre_id TEXT PRIMARY KEY,
+        name TEXT
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS person (
+        person_id TEXT PRIMARY KEY,
+        name TEXT,
+        category TEXT
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS movie_person (
+        tmdb_id INTEGER REFERENCES movie(tmdb_id),
+        person_id TEXT REFERENCES person(person_id),
+        PRIMARY KEY (tmdb_id, person_id)
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS movie_company (
+        tmdb_id INTEGER REFERENCES movie(tmdb_id),
+        company_id TEXT REFERENCES production_company(company_id),
+        PRIMARY KEY (tmdb_id, company_id)
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS movie_genre (
+        tmdb_id INTEGER REFERENCES movie(tmdb_id),
+        genre_id TEXT REFERENCES genre(genre_id),
+        PRIMARY KEY (tmdb_id, genre_id)
+    );
+    """
+]
 
 def connect_db():
-    return psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    return psycopg2.connect(DATABASE_URL)
 
 def load_json(filename):
     path = os.path.join(DATA_DIR, filename)
@@ -33,54 +81,43 @@ def insert_data(conn, table, columns, data):
         print(f"No data to insert into {table}")
         return
     with conn.cursor() as cur:
-        # Prepare the insert query, e.g. INSERT INTO table (col1, col2) VALUES %s
         query = f"INSERT INTO {table} ({', '.join(columns)}) VALUES %s ON CONFLICT DO NOTHING"
         values = [tuple(d[col] for col in columns) for d in data]
         execute_values(cur, query, values)
         print(f"Inserted {len(data)} rows into {table}")
 
+def create_tables(conn):
+    with conn.cursor() as cur:
+        for sql in CREATE_TABLES_SQL:
+            cur.execute(sql)
+        print("All tables created or already exist.")
+
 def main():
     conn = connect_db()
     try:
-        # Disable autocommit for transaction
         conn.autocommit = False
 
-        # 1. movie
-        movie_data = load_json("movie.json")
-        insert_data(conn, "movie",
-                    ["tmdb_id", "title", "budget", "revenue", "rating", "vote_count", "release_date",
-                     "original_language", "runtime", "source"],
-                    movie_data)
+        # Step 1: Create tables
+        create_tables(conn)
 
-        # 2. production_company
-        company_data = load_json("production_company.json")
-        insert_data(conn, "production_company", ["company_id", "name"], company_data)
+        # Step 2: Load and insert data
+        insert_data(conn, "movie", [
+            "tmdb_id", "title", "budget", "revenue", "rating", "vote_count",
+            "release_date", "original_language", "runtime", "source"
+        ], load_json("movies.json"))
 
-        # 3. genre
-        genre_data = load_json("genre.json")
-        insert_data(conn, "genre", ["genre_id", "name"], genre_data)
-
-        # 4. person
-        person_data = load_json("person.json")
-        insert_data(conn, "person", ["person_id", "name", "category"], person_data)
-
-        # 5. movie_person
-        movie_person_data = load_json("movie_person.json")
-        insert_data(conn, "movie_person", ["tmdb_id", "person_id"], movie_person_data)
-
-        # 6. movie_company
-        movie_company_data = load_json("movie_company.json")
-        insert_data(conn, "movie_company", ["tmdb_id", "company_id"], movie_company_data)
-
-        # 7. movie_genre
-        movie_genre_data = load_json("movie_genre.json")
-        insert_data(conn, "movie_genre", ["tmdb_id", "genre_id"], movie_genre_data)
+        insert_data(conn, "production_company", ["company_id", "name"], load_json("production_companies.json"))
+        insert_data(conn, "genre", ["genre_id", "name"], load_json("genres.json"))
+        insert_data(conn, "person", ["person_id", "name", "category"], load_json("persons.json"))
+        insert_data(conn, "movie_person", ["tmdb_id", "person_id"], load_json("movie_person.json"))
+        insert_data(conn, "movie_company", ["tmdb_id", "company_id"], load_json("movie_company.json"))
+        insert_data(conn, "movie_genre", ["tmdb_id", "genre_id"], load_json("movie_genre.json"))
 
         conn.commit()
-        print("✅ All data loaded successfully!")
+        print("All data loaded successfully!")
     except Exception as e:
         conn.rollback()
-        print("❌ Error loading data:", e)
+        print("Error loading data:", e)
     finally:
         conn.close()
 

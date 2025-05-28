@@ -1,135 +1,120 @@
-import os
-import glob
-import json
 import pandas as pd
+import json
+import os
+from uuid import uuid4
 
-# Paths
-input_dir = 'Data/clean_data'
-output_dir = 'Data/load_data'
-os.makedirs(output_dir, exist_ok=True)
+# Directory containing your CSVs
+CSV_DIR = "Data/clean_data"
+OUTPUT_DIR = "Data/json_to_load"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Master sets and mappings to deduplicate and assign IDs
-genre_id_map = {}
-company_id_map = {}
-person_id_map = {}
+# ID counters
+company_id_counter = 1
+genre_id_counter = 1
+person_id_counter = 1
 
-genre_counter = 1
-company_counter = 1
-person_counter = 1
-
-# Final data holders
+# Collectors for all tables
 movies = []
-genres = []
-companies = []
-persons = []
+production_companies = {}
+genres = {}
+persons = {}
+movie_company_links = []
+movie_genre_links = []
+movie_person_links = []
 
-movie_genres = []
-movie_companies = []
-movie_persons = []
+LANGUAGES = ["en", "hi", "ja", "ko", "th"]  # example languages
 
-# Loop through all CSV files
-for file in glob.glob(os.path.join(input_dir, "*.csv")):
-    df = pd.read_csv(file)
+def split_actors_field(actors_str):
+    """
+    Since actors in your CSV are space-separated without commas,
+    use a heuristic: split by capitalized words sequences.
+    This is a simple approach and may need tuning for edge cases.
+    """
+    import re
+    # Matches sequences of capitalized words (names)
+    pattern = r'([A-Z][a-z]+(?: [A-Z][a-z]+)*)'
+    matches = re.findall(pattern, actors_str)
+    return [m.strip() for m in matches if m.strip()]
+
+for lang in LANGUAGES:
+    csv_path = os.path.join(CSV_DIR, f"clean_{lang}_movies_2024.csv")
+    if not os.path.exists(csv_path):
+        print(f"Warning: {csv_path} not found, skipping.")
+        continue
+
+    df = pd.read_csv(csv_path)
 
     for _, row in df.iterrows():
-        tmdb_id = row["tmdb_id"]
-        title = row["title"]
-        budget = row["budget"]
-        revenue = row["revenue"]
-        rating = row["rating"]
-        vote_count = row["vote_count"]
-        release_date = row["release_date"]
-        original_language = row["original_language"]
-        runtime = row["runtime"]
-        source = row.get("source", os.path.basename(file))
-
-        # --- Movie Table ---
-        movies.append({
+        tmdb_id = int(row["tmdb_id"])
+        movie_entry = {
             "tmdb_id": tmdb_id,
-            "title": title,
-            "budget": budget,
-            "revenue": revenue,
-            "rating": rating,
-            "vote_count": vote_count,
-            "release_date": release_date,
-            "original_language": original_language,
-            "runtime": runtime,
-            "source": source
-        })
+            "title": row["title"],
+            "budget": int(row.get("budget", 0)),
+            "revenue": int(row.get("revenue", 0)),
+            "rating": float(row.get("rating", 0)),
+            "vote_count": int(row.get("vote_count", 0)),
+            "release_date": row.get("release_date"),
+            "original_language": row["original_language"],
+            "runtime": float(row.get("runtime", 0)),
+            "source": lang
+        }
+        movies.append(movie_entry)
 
-        # --- Genre Table + movie_genre ---
-        genre_str = str(row.get("genres", ""))
-        genre_list = [g.strip() for g in genre_str.split(",") if g.strip()]
-        for genre in genre_list:
-            if genre not in genre_id_map:
-                genre_id_map[genre] = genre_counter
-                genres.append({"genre_id": genre_counter, "name": genre})
-                genre_counter += 1
-            movie_genres.append({
-                "tmdb_id": tmdb_id,
-                "genre_id": genre_id_map[genre]
-            })
+        # Production companies (comma-separated)
+        for name in str(row.get("production_companies", "")).split(","):
+            name = name.strip()
+            if name:
+                if name not in production_companies:
+                    production_companies[name] = company_id_counter
+                    company_id_counter += 1
+                movie_company_links.append({"tmdb_id": tmdb_id, "company_id": production_companies[name]})
 
-        # --- Production Companies Table + movie_company ---
-        company_str = str(row.get("production_companies", ""))
-        company_list = [c.strip() for c in company_str.split(",") if c.strip()]
-        for company in company_list:
-            if company not in company_id_map:
-                company_id_map[company] = company_counter
-                companies.append({"company_id": company_counter, "name": company})
-                company_counter += 1
-            movie_companies.append({
-                "tmdb_id": tmdb_id,
-                "company_id": company_id_map[company]
-            })
+        # Genres (comma-separated)
+        for name in str(row.get("genres", "")).split(","):
+            name = name.strip()
+            if name:
+                if name not in genres:
+                    genres[name] = genre_id_counter
+                    genre_id_counter += 1
+                movie_genre_links.append({"tmdb_id": tmdb_id, "genre_id": genres[name]})
 
-        # --- Person Table + movie_person ---
-        # Directors separated by commas
-        directors_str = str(row.get("directors", ""))
-        directors_list = [p.strip() for p in directors_str.split(",") if p.strip()]
-        for director in directors_list:
-            if director not in person_id_map:
-                person_id_map[director] = person_counter
-                persons.append({
-                    "person_id": person_counter,
-                    "name": director,
-                    "category": "Director"
-                })
-                person_counter += 1
-            movie_persons.append({
-                "tmdb_id": tmdb_id,
-                "person_id": person_id_map[director]
-            })
+        # Directors (comma-separated)
+        for name in str(row.get("directors", "")).split(","):
+            name = name.strip()
+            if name:
+                if name not in persons:
+                    persons[name] = {"id": person_id_counter, "category": "Director"}
+                    person_id_counter += 1
+                movie_person_links.append({"tmdb_id": tmdb_id, "person_id": persons[name]["id"]})
 
-        # Actors separated by semicolons
-        actors_str = str(row.get("actors", ""))
-        actors_list = [p.strip() for p in actors_str.split(";") if p.strip()]
-        for actor in actors_list:
-            if actor not in person_id_map:
-                person_id_map[actor] = person_counter
-                persons.append({
-                    "person_id": person_counter,
-                    "name": actor,
-                    "category": "Actor"
-                })
-                person_counter += 1
-            movie_persons.append({
-                "tmdb_id": tmdb_id,
-                "person_id": person_id_map[actor]
-            })
+        # Actors (space-separated in your CSV, so use regex split)
+        actors_raw = str(row.get("actors", ""))
+        actors = split_actors_field(actors_raw)
+        for name in actors:
+            if name:
+                if name not in persons:
+                    persons[name] = {"id": person_id_counter, "category": "Actor"}
+                    person_id_counter += 1
+                movie_person_links.append({"tmdb_id": tmdb_id, "person_id": persons[name]["id"]})
 
-# Save function
-def save_json(data, filename):
-    with open(os.path.join(output_dir, filename), "w", encoding="utf-8") as f:
+def write_json(data, filename):
+    with open(os.path.join(OUTPUT_DIR, filename), "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+write_json(movies, "movies.json")
+write_json(
+    [{"company_id": v, "name": k} for k, v in production_companies.items()],
+    "production_companies.json"
+)
+write_json(
+    [{"genre_id": v, "name": k} for k, v in genres.items()],
+    "genres.json"
+)
+write_json(
+    [{"person_id": v["id"], "name": k, "category": v["category"]} for k, v in persons.items()],
+    "persons.json"
+)
+write_json(movie_company_links, "movie_company.json")
+write_json(movie_genre_links, "movie_genre.json")
+write_json(movie_person_links, "movie_person.json")
 
-# Save all tables to json files
-save_json(movies, "movie.json")
-save_json(companies, "production_company.json")
-save_json(genres, "genre.json")
-save_json(persons, "person.json")
-save_json(movie_persons, "movie_person.json")
-save_json(movie_companies, "movie_company.json")
-save_json(movie_genres, "movie_genre.json")
-
-print("✅ Normalization complete. JSON files saved to Data/load_data.")
+print("Normalization and JSON export complete.")
