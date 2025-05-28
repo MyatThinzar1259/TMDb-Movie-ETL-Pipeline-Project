@@ -1,88 +1,88 @@
-import os
 import json
-import psycopg2
-from psycopg2.extras import execute_values
+import os
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date, ForeignKey, Table
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
 from dotenv import load_dotenv
 
-load_dotenv()  # Load .env variables
+# Load DB credentials from .env
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASS = os.getenv("DB_PASS")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT", 5432)
+# SQLAlchemy setup
+Base = declarative_base()
+engine = create_engine(DATABASE_URL)
+Session = sessionmaker(bind=engine)
+session = Session()
 
-DATA_DIR = "Data/load_data"  # where your JSON files are
+# Define tables
+class Movie(Base):
+    __tablename__ = 'movies'
+    tmdb_id = Column(Integer, primary_key=True)
+    title = Column(String)
+    budget = Column(Integer)
+    revenue = Column(Integer)
+    rating = Column(Float)
+    vote_count = Column(Integer)
+    release_date = Column(Date)
+    original_language = Column(String)
+    runtime = Column(Float)
+    source = Column(String)
 
-def connect_db():
-    return psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+class ProductionCompany(Base):
+    __tablename__ = 'production_companies'
+    company_id = Column(Integer, primary_key=True)
+    name = Column(String)
 
-def load_json(filename):
-    path = os.path.join(DATA_DIR, filename)
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+class Genre(Base):
+    __tablename__ = 'genres'
+    genre_id = Column(Integer, primary_key=True)
+    name = Column(String)
 
-def insert_data(conn, table, columns, data):
-    if not data:
-        print(f"No data to insert into {table}")
-        return
-    with conn.cursor() as cur:
-        # Prepare the insert query, e.g. INSERT INTO table (col1, col2) VALUES %s
-        query = f"INSERT INTO {table} ({', '.join(columns)}) VALUES %s ON CONFLICT DO NOTHING"
-        values = [tuple(d[col] for col in columns) for d in data]
-        execute_values(cur, query, values)
-        print(f"Inserted {len(data)} rows into {table}")
+class Person(Base):
+    __tablename__ = 'persons'
+    person_id = Column(Integer, primary_key=True)
+    name = Column(String)
+    category = Column(String)
 
-def main():
-    conn = connect_db()
-    try:
-        # Disable autocommit for transaction
-        conn.autocommit = False
+class MoviePerson(Base):
+    __tablename__ = 'movie_persons'
+    tmdb_id = Column(Integer, ForeignKey('movies.tmdb_id'), primary_key=True)
+    person_id =   Column(Integer, ForeignKey('persons.person_id'), primary_key=True)
 
-        # 1. movie
-        movie_data = load_json("movie.json")
-        insert_data(conn, "movie",
-                    ["tmdb_id", "title", "budget", "revenue", "rating", "vote_count", "release_date",
-                     "original_language", "runtime", "source"],
-                    movie_data)
+class MovieCompany(Base):
+    __tablename__ = 'movie_companies'
+    tmdb_id = Column(Integer, ForeignKey('movies.tmdb_id'), primary_key=True)
+    company_id = Column(Integer, ForeignKey('production_companies.company_id'), primary_key=True)
 
-        # 2. production_company
-        company_data = load_json("production_company.json")
-        insert_data(conn, "production_company", ["company_id", "name"], company_data)
+class MovieGenre(Base):
+    __tablename__ = 'movie_genres'
+    tmdb_id = Column(Integer, ForeignKey('movies.tmdb_id'), primary_key=True)
+    genre_id = Column(Integer, ForeignKey('genres.genre_id'), primary_key=True)
 
-        # 3. genre
-        genre_data = load_json("genre.json")
-        insert_data(conn, "genre", ["genre_id", "name"], genre_data)
+# Create tables
+Base.metadata.create_all(engine)
 
-        # 4. person
-        person_data = load_json("person.json")
-        insert_data(conn, "person", ["person_id", "name", "category"], person_data)
+# Load JSON and insert into database
+def load_json_to_table(json_file, model_class):
+    with open(json_file, encoding='utf-8') as f:
+        data = json.load(f)
+        for record in data:
+            obj = model_class(**record)
+            session.merge(obj)  # insert or update
+    session.commit()
 
-        # 5. movie_person
-        movie_person_data = load_json("movie_person.json")
-        insert_data(conn, "movie_person", ["tmdb_id", "person_id"], movie_person_data)
 
-        # 6. movie_company
-        movie_company_data = load_json("movie_company.json")
-        insert_data(conn, "movie_company", ["tmdb_id", "company_id"], movie_company_data)
 
-        # 7. movie_genre
-        movie_genre_data = load_json("movie_genre.json")
-        insert_data(conn, "movie_genre", ["tmdb_id", "genre_id"], movie_genre_data)
+# Load all JSON files from normalized_json
+DATA_DIR = "Data/normalized_json"
 
-        conn.commit()
-        print("✅ All data loaded successfully!")
-    except Exception as e:
-        conn.rollback()
-        print("❌ Error loading data:", e)
-    finally:
-        conn.close()
+load_json_to_table(f"{DATA_DIR}/movies.json", Movie)
+load_json_to_table(f"{DATA_DIR}/production_companies.json", ProductionCompany)
+load_json_to_table(f"{DATA_DIR}/genres.json", Genre)
+load_json_to_table(f"{DATA_DIR}/persons.json", Person)
+load_json_to_table(f"{DATA_DIR}/movie_company.json", MovieCompany)
+load_json_to_table(f"{DATA_DIR}/movie_genre.json", MovieGenre)
+load_json_to_table(f"{DATA_DIR}/movie_person.json", MoviePerson)
 
-if __name__ == "__main__":
-    main()
+print("All data loaded successfully.")
