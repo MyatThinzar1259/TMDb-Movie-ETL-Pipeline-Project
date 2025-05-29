@@ -5,6 +5,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from typing import Optional, Dict, List
 from dotenv import load_dotenv
+import re
+from utils import normalize_title  # <-- import normalize_title from utils
 
 # Load environment variables
 load_dotenv()
@@ -121,7 +123,18 @@ class TMDbAPIClient:
                 return None
 
             if data.get("results"):
-                movie_id = data["results"][0].get("id")
+                movie_index = 0
+                if len(data["results"]) > 1:
+                    for idx, movie in enumerate(data["results"]):
+                        if(movie.get('id') == 1299652):
+                            self.logger.info(f"Found exact match for '{title}' at index {idx}")
+                        # Use normalize_title from utils
+                        if normalize_title(title) == normalize_title(movie.get("title", "")):
+                            movie_index = idx
+                            break
+                    else:
+                        self.logger.warning(f"No exact title match found for '{title}', using the first match.")
+                movie_id = data["results"][movie_index].get("id")
                 if movie_id:
                     self.logger.info(f"Fetching TMDb details for movie ID: {movie_id} ({title})")
                     return self.get_movie_full_details(movie_id)

@@ -1,5 +1,6 @@
 import csv
 import os
+import re
 from typing import List, Dict
 
 def load_movies_from_csv(input_path: str) -> List[Dict]:
@@ -54,3 +55,7 @@ def extract_names(items: list, key: str) -> str:
 
 def format_actors(actors: list) -> str:
     return ', '.join([f"{a['name']} ({a.get('character', '')})" for a in actors if a.get('name')])
+
+def normalize_title(s: str) -> str:
+    """Normalize a movie title for comparison: lowercase, remove punctuation, extra spaces."""
+    return re.sub(r'[\W_]+', ' ', s or '').strip().lower()
