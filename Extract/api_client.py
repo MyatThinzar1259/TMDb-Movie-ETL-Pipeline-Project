@@ -19,6 +19,7 @@ class TMDbAPIClient:
         self.base_url = "https://api.themoviedb.org/3"
         self.logger = logging.getLogger(__name__)
 
+        #using the requests library , sets up a requests.Session with a retry strategy and connection pooling   
         # Create session with retry strategy and connection pooling
         self.session = requests.Session()
         retry = Retry(
@@ -39,6 +40,7 @@ class TMDbAPIClient:
         """Make HTTP request with retry logic using session"""
         try:
             self.logger.info(f"Fetching URL: {url}")
+            #is making an HTTP GET request using the configured session 
             response = self.session.get(url, params=params)
             response.raise_for_status()
             return response.json()
