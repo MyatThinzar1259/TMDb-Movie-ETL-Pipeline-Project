@@ -145,7 +145,7 @@ def fetch_and_save_movies(language_code: str) -> None:
 
 def main():
     """Main function"""
-    languages = ['hi', 'ko', 'ja', 'th', 'tl']  # Add more languages as needed: ['hi', 'ko', 'jp', 'th', 'tl']
+    languages = ['hi']  # Add more languages as needed: ['hi', 'ko', 'jp', 'th', 'tl']
 
     for lang in languages:
         logger.info("=" * 40)

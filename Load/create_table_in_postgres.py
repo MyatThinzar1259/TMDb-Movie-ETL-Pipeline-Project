@@ -1,6 +1,6 @@
 import os
-import psycopg2
 from dotenv import load_dotenv
+from db import get_connection
 
 # Load DATABASE_URL from .env
 load_dotenv()
@@ -65,18 +65,15 @@ CREATE_TABLES_SQL = [
 ]
 
 def create_tables():
-    conn = psycopg2.connect(DATABASE_URL)
     try:
-        with conn.cursor() as cur:
-            for sql in CREATE_TABLES_SQL:
-                cur.execute(sql)
-        conn.commit()
-        print("Tables created successfully.")
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                for sql in CREATE_TABLES_SQL:
+                    cur.execute(sql)
+            conn.commit()
+            print("Tables created successfully.")
     except Exception as e:
-        conn.rollback()
         print("Error creating tables:", e)
-    finally:
-        conn.close()
 
 if __name__ == "__main__":
     create_tables()
