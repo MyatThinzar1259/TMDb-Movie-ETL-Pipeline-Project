@@ -7,10 +7,23 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 # === Load environment variables ===
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
 
 # === SQLAlchemy setup ===
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    "postgresql+psycopg2://",
+    connect_args={
+        "host": DB_HOST,
+        "port": DB_PORT,
+        "user": DB_USER,
+        "password": DB_PASSWORD,
+        "dbname": DB_NAME
+    }
+)
 Session = sessionmaker(bind=engine)
 
 Base = declarative_base()
