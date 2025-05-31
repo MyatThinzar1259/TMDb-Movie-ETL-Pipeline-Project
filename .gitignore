@@ -9,3 +9,5 @@ Power_BI
 logs
 __pycache__/
 myenv
+.github
+.pytest_cache
