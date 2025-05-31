@@ -19,7 +19,7 @@ class TMDbAPIClient:
         self.base_url = "https://api.themoviedb.org/3"
         self.logger = logging.getLogger(__name__)
 
-        #using the requests library , sets up a requests.Session with a retry strategy and connection pooling   
+        #using the requests library , sets up a requests.Session with a retry strategy and connection pooling
         # Create session with retry strategy and connection pooling
         self.session = requests.Session()
         retry = Retry(
@@ -40,7 +40,7 @@ class TMDbAPIClient:
         """Make HTTP request with retry logic using session"""
         try:
             self.logger.info(f"Fetching URL: {url}")
-            #is making an HTTP GET request using the configured session 
+            #is making an HTTP GET request using the configured session
             response = self.session.get(url, params=params)
             response.raise_for_status()
             return response.json()
@@ -128,8 +128,6 @@ class TMDbAPIClient:
                 movie_index = 0
                 if len(data["results"]) > 1:
                     for idx, movie in enumerate(data["results"]):
-                        if(movie.get('id') == 1299652):
-                            self.logger.info(f"Found exact match for '{title}' at index {idx}")
                         # Use normalize_title from utils
                         if normalize_title(title) == normalize_title(movie.get("title", "")):
                             movie_index = idx

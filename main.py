@@ -7,8 +7,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.StreamHandler(),  # Console output
-        logging.FileHandler("logs/etl_pipeline.log", mode='w')  # Log file output
+        logging.StreamHandler(),
+        logging.FileHandler("logs/etl_pipeline.log", mode='w')
     ]
 )
 logger = logging.getLogger(__name__)
@@ -20,16 +20,15 @@ sys.path.insert(0, os.path.join(project_root, "Extract"))
 sys.path.insert(0, os.path.join(project_root, "Transform"))
 sys.path.insert(0, os.path.join(project_root, "Load"))
 
-# --- Step Runner Helper ---
 def run_step(step_name: str, func):
     logger.info(f"[ETL] Step: {step_name}")
     try:
         func()
+        logger.info(f"[ETL] {step_name} completed successfully.")
     except Exception as e:
         logger.exception(f"[ERROR] {step_name} failed: {e}")
         sys.exit(1)
 
-# --- Step Functions ---
 def step_1_extract_tmdb():
     from Extract.tmdb import main as tmdb_extract_main
     tmdb_extract_main()
@@ -47,7 +46,7 @@ def step_4_transform_wiki():
     process_all_wiki_files()
 
 def step_5_normalize_json():
-    from Transform.normalize_csv_to_json import main as normalize_main
+    from Load.data_normalizer import main as normalize_main
     normalize_main()
 
 def step_6_create_tables():
@@ -55,7 +54,7 @@ def step_6_create_tables():
     create_tables()
 
 def step_7_insert_data():
-    from Load.insert_data_to_postgres import main as load_main
+    from Load.load_json_to_postgres import main as load_main
     load_main()
 
 # --- Run ETL Pipeline ---
