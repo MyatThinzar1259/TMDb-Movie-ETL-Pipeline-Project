@@ -2,13 +2,18 @@ import os
 import sys
 import logging
 
+# --- Ensure logs directory exists before configuring logging ---
+log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir, exist_ok=True)
+
 # --- Configure Logging ---
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("logs/etl_pipeline.log", mode='w')
+        logging.FileHandler(os.path.join(log_dir, "etl_pipeline.log"), mode='w')
     ]
 )
 logger = logging.getLogger(__name__)
@@ -49,11 +54,15 @@ def step_5_normalize_json():
     from Load.data_normalizer import main as normalize_main
     normalize_main()
 
-def step_6_create_tables():
+def step_6_start_fact_builder():
+    from Load.star_fact_builder import main as start_fact_builder_main
+    start_fact_builder_main()
+
+def step_7_create_tables():
     from Load.create_table_in_postgres import create_tables
     create_tables()
 
-def step_7_insert_data():
+def step_8_insert_data():
     from Load.load_json_to_postgres import main as load_main
     load_main()
 
@@ -66,7 +75,8 @@ if __name__ == "__main__":
     run_step("Step 3: Transforming TMDb data", step_3_transform_tmdb)
     run_step("Step 4: Transforming Wikipedia data", step_4_transform_wiki)
     run_step("Step 5: Normalizing and exporting to JSON", step_5_normalize_json)
-    run_step("Step 6: Creating tables in PostgreSQL", step_6_create_tables)
-    run_step("Step 7: Inserting data into PostgreSQL", step_7_insert_data)
+    run_step("Step 6: Starting star fact builder", step_6_start_fact_builder)
+    run_step("Step 7: Creating PostgreSQL tables", step_7_create_tables)
+    run_step("Step 8: Loading data into PostgreSQL", step_8_insert_data)
 
     logger.info("[ETL] Pipeline completed successfully")
