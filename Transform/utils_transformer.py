@@ -57,6 +57,13 @@ def standardize_language_code(code: str) -> str:
         'jp': 'Japanese',
         'th': 'Thai',
         'tl': 'Filipino',
-        'en': 'English'
+        'en': 'English',
+        'RU': 'Russian',
+        'MK': 'Macedonian',
+        'ZH': 'Chinese',
+        'FR': 'French',
+        'PL': 'Polish',
+        'EL': 'Greek',
+        'ES': 'Spanish'
     }
     return code_map.get(code.lower(), code.upper())

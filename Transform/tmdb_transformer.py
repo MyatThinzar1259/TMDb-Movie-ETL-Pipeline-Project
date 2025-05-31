@@ -49,7 +49,7 @@ def transform_wiki_data(input_path: str, output_dir: str = "Data/clean_data") ->
         df = df[[col for col in output_columns if col in df.columns]]
 
         # Add source column
-        df['source'] = 'Wikipedia'
+        df['source'] = 'TMDB'
 
         # Save transformed data
         output_filename = f"clean_{input_filename}"
